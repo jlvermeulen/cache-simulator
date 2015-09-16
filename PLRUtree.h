@@ -1,17 +1,18 @@
 #pragma once
+include < stdint.h > ;
 class PLRUtree
 {
 public:
-	unsigned size;
+	uint32_t size;
 	PLRUtree(unsigned size) :size(size){}
 	~PLRUtree();
-	unsigned addresses[16];
+	uint32_t addresses[16];
 	bool binaryTree[16];
 
-	unsigned getOverwriteTarget()
+	uint32_t getOverwriteTarget()
 	{
-		int s = size / 2;
-		int t = s;
+		uint32_t s = size / 2;
+		uint32_t t = s;
 		while (s!=1)
 		{
 			s /= 2;
@@ -27,10 +28,10 @@ public:
 	}
 
 
-	void setPath(unsigned element)
+	void setPath(uint32_t element)
 	{
-		int s = size / 2;
-		int t = s;
+		uint32_t s = size / 2;
+		uint32_t t = s;
 		while (s != 1)
 		{
 			s /= 2;

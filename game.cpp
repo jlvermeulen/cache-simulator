@@ -14,7 +14,7 @@ void Map::Set( int x, int y, int v )
 	WRITE( &map[x + y * 513], v ); 
 }
 
-#define READ_SIZE 1
+#define READ_SIZE 2
 
 // -----------------------------------------------------------
 // Initialize the application
@@ -27,58 +27,22 @@ void Game::Init()
 	taskPtr = 0;
 	Push( 0, 0, 512, 512, 256 );
 
-	std::uint32_t address = 0x15;
+	std::uint32_t address = 0x06;
 	std::uint32_t tag = address >> 4;
-
 	Cache<4, 1> cache;
-	CacheLine one, two, three, four;
 
-	one.tag = tag;
-	one.data[0] = 0x1;
-	one.data[1] = 0x2;
-	one.data[2] = 0x3;
-	one.data[3] = 0x4;
-	one.valid = true;
-	one.dirty = false;
-
-	two.tag = tag;
-	two.data[0] = 0x1;
-	two.data[1] = 0x2;
-	two.data[2] = 0x3;
-	two.data[3] = 0x4;
-	two.valid = true;
-	two.dirty = false;
-
-	three.tag = tag;
-	three.data[0] = 0x1;
-	three.data[1] = 0x2;
-	three.data[2] = 0x3;
-	three.data[3] = 0x4;
-	three.valid = true;
-	three.dirty = false;
-
-	four.tag = tag;
-	four.data[0] = 0x1;
-	four.data[1] = 0x2;
-	four.data[2] = 0x3;
-	four.data[3] = 0x4;
-	four.valid = true;
-	four.dirty = false;
-
-	cache.cache[0][0] = one;
-	cache.cache[1][0] = two;
-	cache.cache[2][0] = three;
-	cache.cache[3][0] = four;
+	std::uint32_t value = 0x04030201;
+	cache.WriteData<std::uint32_t>(0x00, value);
+	cache.WriteData<std::uint32_t>(0x04, value);
+	cache.WriteData<std::uint32_t>(0x08, value);
+	cache.WriteData<std::uint32_t>(0x0C, value);
 
 	cache.Print();
 
-	byte result[READ_SIZE];
-	cache.ReadData(address, READ_SIZE, result);
+	std::uint16_t r = cache.ReadData<std::uint16_t>(address);
+
 	std::cout << "Reading cache at 0x" << std::hex << setfill('0') << setw(8) << address << std::dec << std::endl;
-	std::cout << "Value: 0x" << std::hex;
-	for (int i = READ_SIZE - 1; i >= 0; i--)
-		std::cout << setfill('0') << setw(2) << (int)result[i];
-	std::cout << std::dec << std::endl;
+	std::cout << "Value: 0x" << std::hex << setfill('0') << setw(sizeof(r) * 2) << r << std::dec << std::endl;
 }
 
 // -----------------------------------------------------------

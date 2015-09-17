@@ -10,6 +10,14 @@ struct CacheLine
 	std::uint32_t tag;
 	byte data[LINESIZE];
 	bool valid, dirty;
+
+	CacheLine() { }
+	CacheLine(std::uint32_t tag, byte* data, bool valid, bool dirty)
+		: tag(tag), valid(valid), dirty(dirty)
+	{
+		for (int i = 0; i < LINESIZE; ++i)
+			this->data[i] = data[i];
+	}
 };
 
 template<std::uint32_t size, std::uint32_t assoc>
@@ -19,44 +27,86 @@ public:
 	CacheLine cache[size][assoc];
 
 public:
-	Cache() { }
+	Cache()
+	{
+		byte data[LINESIZE] = {};
+		for (int i = 0; i < size; ++i)
+			for (int j = 0; j < assoc; ++j)
+				cache[i][j] = CacheLine(0, data, false, false);
+	}
 	~Cache() { }
 
-	bool ReadData(std::uint32_t address, std::uint32_t nrOfBytes, byte* value)
+	template<typename T>
+	T ReadData(std::uint32_t address)
+	{
+		byte data[sizeof(T)];
+		ReadData(address, sizeof(T), data);
+		T* result = reinterpret_cast<T*>(data);
+		return *result;
+	}
+
+	template<typename T>
+	void WriteData(std::uint32_t address, T value)
+	{
+		WriteData(address, sizeof(T), reinterpret_cast<byte*>(&value));
+	}
+
+	void ReadData(std::uint32_t address, std::uint32_t nrOfBytes, byte* result)
+	{
+		if (address % nrOfBytes != 0) // not aligned, should never happen
+		{
+			std::cout << "UNALIGNED READ ATTEMPT" << std::endl;
+			return;
+		}
+
+		std::uint32_t offset, index, tag;
+		AddressToOffsetIndexTag(address, offset, index, tag);
+
+		CacheLine* line = FindCacheLine(index, tag);
+		if (line == nullptr)
+			return; // TODO: relay to other cache/RAM
+
+		for (std::uint32_t i = 0; i < nrOfBytes; ++i) // copy found data
+			result[i] = line->data[offset + i];
+	}
+
+	void WriteData(std::uint32_t address, std::uint32_t nrOfBytes, byte* value)
 	{
 		if (address % nrOfBytes != 0) // not aligned, should never happen
 		{
 			// BIG FAIL CODE HERE
-			return false;
+			return;
 		}
 
-		std::uint32_t offsetBits = 0, indexBits = 0;
-		for (std::uint32_t i = LINESIZE; i != 1; i >>= 1, ++offsetBits); // determine number of bits in offset
-		for (std::uint32_t i = size; i != 1; i >>= 1, ++indexBits); // determine number of bits in index
+		std::uint32_t offset, index, tag;
+		AddressToOffsetIndexTag(address, offset, index, tag);
 
-		std::uint32_t offset = address & (LINESIZE - 1);
-		std::uint32_t index = (address >> offsetBits) & (size - 1);
-		std::uint32_t tag = (address >> (offsetBits + indexBits));
+		CacheLine* line = FindCacheLine(index, tag);
+		if (line == nullptr) // data wasn't in cache
+		{
+			CacheLine* row = cache[index];
+			for (std::uint32_t i = 0; i < assoc; ++i) // find open slot to write to
+				if (!row[i].valid)
+				{
+					line = &row[i];
+					break;
+				}
 
-		CacheLine* row = cache[index];
-		CacheLine* line = nullptr;
-		for (std::uint32_t i = 0; i < assoc; ++i) // find correct column
-			if (row[i].valid && row[i].tag == tag)
+			if (line == nullptr) // no open slots
 			{
-				line = &row[i]; // found line containing our data
-				break;
+				// TODO: evict
+				return;
 			}
+		}
 
-		if (line == nullptr)
-			return false;
+		for (std::uint32_t i = 0; i < nrOfBytes; ++i) // write the data
+			line->data[offset + i] = value[i];
 
-		for (std::uint32_t i = 0; i < nrOfBytes; ++i) // copy found data
-			value[i] = line->data[offset + i];
-
-		return true;
+		line->dirty = true;
+		line->valid = true;
 	}
 
-	void Print()
+	void Print() const
 	{
 		for (int i = 0; i < size; ++i)
 			for (int j = 0; j < assoc; ++j)
@@ -66,6 +116,32 @@ public:
 					std::cout << std::hex << setfill('0') << setw(2) << (int)cache[i][j].data[k];
 				std::cout << std::dec << ", " << cache[i][j].valid << ", " << cache[i][j].dirty << ")" << std::endl;
 			}
+	}
+
+private:
+	void AddressToOffsetIndexTag(std::uint32_t address, std::uint32_t& offset, std::uint32_t& index, std::uint32_t& tag) const
+	{
+		std::uint32_t offsetBits = 0, indexBits = 0;
+		for (std::uint32_t i = LINESIZE; i != 1; i >>= 1, ++offsetBits); // determine number of bits in offset
+		for (std::uint32_t i = size; i != 1; i >>= 1, ++indexBits); // determine number of bits in index
+
+		offset = address & (LINESIZE - 1);
+		index = (address >> offsetBits) & (size - 1);
+		tag = (address >> (offsetBits + indexBits));
+	}
+
+	CacheLine* FindCacheLine(std::uint32_t index, std::uint32_t tag)
+	{
+		CacheLine* row = cache[index];
+		CacheLine* line = nullptr;
+		for (std::uint32_t i = 0; i < assoc; ++i) // find correct column
+			if (row[i].valid && row[i].tag == tag)
+			{
+				line = &row[i]; // found line containing our data
+				break;
+			}
+
+		return line;
 	}
 };
 

@@ -1,4 +1,5 @@
 #include "precomp.h"
+#include "cache.h"
 
 int READ( int* address )
 {

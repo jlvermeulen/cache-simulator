@@ -217,7 +217,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="cache.cpp" />
     <ClCompile Include="counters.cpp" />
     <ClCompile Include="game.cpp" />
     <ClCompile Include="surface.cpp" />

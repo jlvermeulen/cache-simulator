@@ -21,7 +21,6 @@ void Map::Set( int x, int y, int v )
 // -----------------------------------------------------------
 void Game::Init()
 {
-	
 	screen->Clear( 0 );
 	// initialize recursion stack
 	map.Init();

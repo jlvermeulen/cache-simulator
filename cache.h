@@ -58,10 +58,10 @@ public:
 		for (int i = 0; i < size; ++i)
 			for (int j = 0; j < assoc; ++j)
 			{
-			std::cout << "(0x" << std::hex << setfill('0') << setw(sizeof(cache[i][j].tag) * 2) << cache[i][j].tag << std::dec << ", 0x";
-			for (int k = LINESIZE - 1; k >= 0; --k)
-				std::cout << std::hex << setfill('0') << setw(sizeof(cache[i][j].data[k]) * 2) << (int)cache[i][j].data[k];
-			std::cout << std::dec << ", " << cache[i][j].valid << ", " << cache[i][j].dirty << ")" << std::endl;
+				std::cout << "(0x" << std::hex << setfill('0') << setw(sizeof(cache[i][j].tag) * 2) << cache[i][j].tag << std::dec << ", 0x";
+				for (int k = LINESIZE - 1; k >= 0; --k)
+					std::cout << std::hex << setfill('0') << setw(sizeof(cache[i][j].data[k]) * 2) << (int)cache[i][j].data[k];
+				std::cout << std::dec << ", " << cache[i][j].valid << ", " << cache[i][j].dirty << ")" << std::endl;
 			}
 	}
 
@@ -88,9 +88,9 @@ private:
 			for (std::uint32_t i = 0; i < assoc; ++i) // find open slot to write to
 				if (!row[i].valid)
 				{
-				line = &row[i];
-				trees[index].setPath(i);
-				break;
+					line = &row[i];
+					trees[index].setPath(i);
+					break;
 				}
 
 			if (line == nullptr) // no open slots
@@ -130,7 +130,7 @@ private:
 		for (std::uint32_t i = 0; i < nrOfBytes; ++i) // copy found data
 			result[i] = line->data[offset + i];
 	}
-	
+
 	void AddressToOffsetIndexTag(std::uintptr_t address, std::uintptr_t& offset, std::uintptr_t& index, std::uintptr_t& tag) const
 	{
 		int offsetBits = 0, indexBits = 0;
@@ -149,24 +149,25 @@ private:
 		for (int i = 0; i < assoc; ++i) // find correct column
 			if (row[i].valid && row[i].tag == tag)
 			{
-			line = &row[i]; // found line containing our data
-			trees[index].setPath(i);
-			break;
+				line = &row[i]; // found line containing our data
+				trees[index].setPath(i);
+				break;
 			}
 
 		return line;
 	}
 };
-	template<typename T>
-	T READ(std::uintptr_t address)
-	{
-		// prevent ReadFromRAM using caching
-		return ReadFromRAM<T>(reinterpret_cast<T*>(address));
-	}
 
-	template<typename T>
-	void WRITE(std::uintptr_t address, T value)
-	{
-		// prevent WriteToRAM using caching
-		WriteToRAM<T>(reinterpret_cast<T*>(address), value);
-	}
+template<typename T>
+T READ(std::uintptr_t address)
+{
+	// prevent ReadFromRAM using caching
+	return ReadFromRAM<T>(reinterpret_cast<T*>(address));
+}
+
+template<typename T>
+void WRITE(std::uintptr_t address, T value)
+{
+	// prevent WriteToRAM using caching
+	WriteToRAM<T>(reinterpret_cast<T*>(address), value);
+}

@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <iomanip>
-
+#include "PLRUtree.h"
 #pragma once
 
 #define LINESIZE 4
@@ -10,6 +10,7 @@ struct CacheLine
 	std::uint32_t tag;
 	byte data[LINESIZE];
 	bool valid, dirty;
+	
 
 	CacheLine() { }
 	CacheLine(std::uint32_t tag, byte* data, bool valid, bool dirty)
@@ -25,14 +26,18 @@ class Cache
 {
 public:
 	CacheLine cache[size][assoc];
+	PLRUtree trees[size];
 
 public:
 	Cache()
 	{
 		byte data[LINESIZE] = {};
 		for (int i = 0; i < size; ++i)
+		{
+			trees[i] = PLRUtree(assoc);
 			for (int j = 0; j < assoc; ++j)
 				cache[i][j] = CacheLine(0, data, false, false);
+		}
 	}
 	~Cache() { }
 
@@ -89,13 +94,14 @@ public:
 				if (!row[i].valid)
 				{
 					line = &row[i];
+					trees[index].setPath(i);
 					break;
 				}
 
 			if (line == nullptr) // no open slots
 			{
-				// TODO: evict
-				return;
+				std::uint32_t evict = trees[index].getOverwriteTarget();
+				line = &row[evict];
 			}
 		}
 
@@ -109,6 +115,7 @@ public:
 	void Print() const
 	{
 		for (int i = 0; i < size; ++i)
+		{
 			for (int j = 0; j < assoc; ++j)
 			{
 				std::cout << "(0x" << std::hex << setfill('0') << setw(8) << cache[i][j].tag << std::dec << ", 0x";
@@ -116,6 +123,8 @@ public:
 					std::cout << std::hex << setfill('0') << setw(2) << (int)cache[i][j].data[k];
 				std::cout << std::dec << ", " << cache[i][j].valid << ", " << cache[i][j].dirty << ")" << std::endl;
 			}
+			std::cout << std::endl;
+		}
 	}
 
 private:
@@ -138,6 +147,7 @@ private:
 			if (row[i].valid && row[i].tag == tag)
 			{
 				line = &row[i]; // found line containing our data
+				trees[index].setPath(i);
 				break;
 			}
 

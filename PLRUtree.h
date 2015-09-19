@@ -1,11 +1,15 @@
 #pragma once
-include < stdint.h > ;
+#include <stdio.h>
+#include <iomanip>
+#include <stdint.h>
+//using namespace std;
 class PLRUtree
 {
 public:
-	uint32_t size;
-	PLRUtree(unsigned size) :size(size){}
-	~PLRUtree();
+	int size;
+	PLRUtree(){}
+	PLRUtree(int size) :size(size){}
+	~PLRUtree(){}
 	uint32_t addresses[16];
 	bool binaryTree[16];
 
@@ -32,7 +36,7 @@ public:
 	{
 		uint32_t s = size / 2;
 		uint32_t t = s;
-		while (s != 1)
+		while (s > 1)
 		{
 			s /= 2;
 			binaryTree[t] = element < t;
@@ -41,7 +45,7 @@ public:
 			else
 				t -= s;
 		}
-
+		binaryTree[t] = element < t;
 	}
 
 };

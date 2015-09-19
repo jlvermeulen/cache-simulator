@@ -32,6 +32,7 @@
       <Filter>template code</Filter>
     </ClInclude>
     <ClInclude Include="cache.h" />
+    <ClInclude Include="PLRUtree.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="template code">

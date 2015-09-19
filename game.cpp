@@ -29,13 +29,18 @@ void Game::Init()
 
 	std::uint32_t address = 0x06;
 	std::uint32_t tag = address >> 4;
-	Cache<4, 1> cache;
+	Cache<4, 4> cache;
 
 	std::uint32_t value = 0x04030201;
 	cache.WriteData<std::uint32_t>(0x00, value);
 	cache.WriteData<std::uint32_t>(0x04, value);
 	cache.WriteData<std::uint32_t>(0x08, value);
 	cache.WriteData<std::uint32_t>(0x0C, value);
+	cache.WriteData<std::uint32_t>(0x10, 0x04030202);
+	cache.WriteData<std::uint32_t>(0x20, 0x04030203);
+	cache.WriteData<std::uint32_t>(0x30, 0x04030204);
+	cache.ReadData<std::uint16_t>(0x00);
+	cache.WriteData<std::uint32_t>(0x40, 0x04030205);
 
 	cache.Print();
 

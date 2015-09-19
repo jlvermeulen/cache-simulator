@@ -230,6 +230,7 @@
     <ClInclude Include="cache.h" />
     <ClInclude Include="counters.h" />
     <ClInclude Include="game.h" />
+    <ClInclude Include="PLRUtree.h" />
     <ClInclude Include="precomp.h" />
     <ClInclude Include="surface.h" />
     <ClInclude Include="template.h" />

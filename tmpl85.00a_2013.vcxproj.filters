@@ -14,7 +14,6 @@
     <ClCompile Include="counters.cpp">
       <Filter>template code</Filter>
     </ClCompile>
-    <ClCompile Include="cache.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="game.h" />

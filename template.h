@@ -22,8 +22,17 @@ typedef unsigned char byte;
 typedef __int64 int64;
 typedef unsigned __int64 uint64;
 
-int ReadFromRAM( int* address );
-void WriteToRAM( int* address, int value );
+#ifdef ENABLECACHETEST
+#define READDELAY Sleep( 0 );
+#else
+#define READDELAY ;
+#endif
+
+template<typename T>
+T ReadFromRAM( T* address ) { READDELAY return *address; }
+
+template<typename T>
+void WriteToRAM( T* address, T value ) { READDELAY *address = value; }
 
 namespace Tmpl8 {
 

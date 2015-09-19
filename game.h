@@ -13,7 +13,7 @@ public:
 	Map() : map( new int[513 * 513] ) {}
 	void Init()
 	{
-		memset( map, 0, 513 * 513 * sizeof( int ) ); 
+		memset( map, 0, 513 * 513 * sizeof( int ) );
 		Set( 0, 0, IRand( 256 ) );
 		Set( 512, 0, IRand( 256 ) );
 		Set( 0, 512, IRand( 256 ) );

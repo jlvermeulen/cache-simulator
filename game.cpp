@@ -5,13 +5,13 @@
 // Map access
 // -----------------------------------------------------------
 int Map::Get( int x, int y ) 
-{ 
-	return READ( &map[x + y * 513] ); 
+{
+	return READ<int>(reinterpret_cast<std::uintptr_t>(&map[x + y * 513]));
 }
 
-void Map::Set( int x, int y, int v ) 
-{ 
-	WRITE( &map[x + y * 513], v ); 
+void Map::Set( int x, int y, int v )
+{
+	WRITE<int>(reinterpret_cast<std::uintptr_t>(&map[x + y * 513]), v);
 }
 
 #define READ_SIZE 2
@@ -27,8 +27,8 @@ void Game::Init()
 	taskPtr = 0;
 	Push( 0, 0, 512, 512, 256 );
 
-	std::uint32_t address = 0x06;
-	std::uint32_t tag = address >> 4;
+	std::uintptr_t address = 0x06;
+	std::uintptr_t tag = address >> 4;
 	Cache<4, 4> cache;
 
 	std::uint32_t value = 0x04030201;
@@ -46,7 +46,7 @@ void Game::Init()
 
 	std::uint16_t r = cache.ReadData<std::uint16_t>(address);
 
-	std::cout << "Reading cache at 0x" << std::hex << setfill('0') << setw(8) << address << std::dec << std::endl;
+	std::cout << "Reading cache at 0x" << std::hex << setfill('0') << setw(sizeof(address) * 2) << address << std::dec << std::endl;
 	std::cout << "Value: 0x" << std::hex << setfill('0') << setw(sizeof(r) * 2) << r << std::dec << std::endl;
 }
 

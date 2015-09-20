@@ -95,8 +95,9 @@ public:
 			{
 				std::uint32_t evict = trees[index].getOverwriteTarget();
 				if (row[evict].dirty)
-					nextLevel->WriteData(index +row[evict].tag, nrOfBytes, row[evict].data);
+					nextLevel->WriteData(index +row[evict].tag, nrOfBytes, row[evict].data); // NOT SURE IF CORRECT
 				line = &row[evict];
+				trees[index].setPath(evict);
 			}
 		}
 

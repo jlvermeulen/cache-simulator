@@ -29,7 +29,11 @@ void Game::Init()
 
 	std::uintptr_t address = 0x06;
 	std::uintptr_t tag = address >> 4;
-	Cache<4, 4> cache;
+	Cache<4, 4> cache2;
+	Cache<4, 4> cache(&cache2);
+	//cache.EvictWrite = &Cache<4, 4>::WriteData2;
+	//cache.FallbackRead = &Cache<4, 4>::ReadData2;
+
 
 	std::uint32_t value = 0x04030201;
 	cache.WriteData<std::uint32_t>(0x00, value);
@@ -39,12 +43,12 @@ void Game::Init()
 	cache.WriteData<std::uint32_t>(0x10, 0x04030202);
 	cache.WriteData<std::uint32_t>(0x20, 0x04030203);
 	cache.WriteData<std::uint32_t>(0x30, 0x04030204);
-	cache.ReadData<std::uint16_t>(0x00);
 	cache.WriteData<std::uint32_t>(0x40, 0x04030205);
+	std::uint16_t r= cache.ReadData<std::uint16_t>(0x00);
 
 	cache.Print();
 
-	std::uint16_t r = cache.ReadData<std::uint16_t>(address);
+	//std::uint16_t r = cache.ReadData<std::uint16_t>(address);
 
 	std::cout << "Reading cache at 0x" << std::hex << setfill('0') << setw(sizeof(address) * 2) << address << std::dec << std::endl;
 	std::cout << "Value: 0x" << std::hex << setfill('0') << setw(sizeof(r) * 2) << r << std::dec << std::endl;

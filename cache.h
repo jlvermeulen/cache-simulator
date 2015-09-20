@@ -26,8 +26,9 @@ class Cache
 {
 public:
 	PLRUtree trees[size];
-	Cache()
+	Cache(Cache *nl = nullptr)
 	{
+		nextLevel = nl;
 		byte data[LINESIZE] = {};
 		for (int i = 0; i < size; ++i)
 		{
@@ -64,13 +65,10 @@ public:
 				std::cout << std::dec << ", " << cache[i][j].valid << ", " << cache[i][j].dirty << ")" << std::endl;
 			}
 	}
+	void(Cache::*FallbackRead)(std::uintptr_t, std::uint32_t, byte*);
+	void(Cache::*EvictWrite)(std::uintptr_t, std::uint32_t, byte*);
 
-private:
-	CacheLine cache[size][assoc];
-	void(*FallbackRead)(std::uintptr_t, std::uint32_t, byte*);
-	void(*EvictWrite)(std::uintptr_t, std::uint32_t, byte*);
-
-	void WriteData(std::uint32_t address, std::uint32_t nrOfBytes, byte* value)
+	void WriteData(std::uintptr_t address, std::uint32_t nrOfBytes, byte* value)
 	{
 		if (address % nrOfBytes != 0) // not aligned, should never happen
 		{
@@ -88,14 +86,16 @@ private:
 			for (std::uint32_t i = 0; i < assoc; ++i) // find open slot to write to
 				if (!row[i].valid)
 				{
-					line = &row[i];
-					trees[index].setPath(i);
-					break;
+				line = &row[i];
+				trees[index].setPath(i);
+				break;
 				}
 
 			if (line == nullptr) // no open slots
 			{
 				std::uint32_t evict = trees[index].getOverwriteTarget();
+				if (row[evict].dirty)
+					nextLevel->WriteData(address, nrOfBytes, value);
 				line = &row[evict];
 			}
 		}
@@ -122,7 +122,7 @@ private:
 		CacheLine* line = FindCacheLine(index, tag);
 		if (line == nullptr) // not in cache, relay to higher level
 		{
-			FallbackRead(address, nrOfBytes, result); // read from next level
+			nextLevel->ReadData(address, nrOfBytes, result); // read from next level
 			WriteData(address, nrOfBytes, result); // store in cache
 			return;
 		}
@@ -130,6 +130,10 @@ private:
 		for (std::uint32_t i = 0; i < nrOfBytes; ++i) // copy found data
 			result[i] = line->data[offset + i];
 	}
+
+private:
+	CacheLine cache[size][assoc];
+	Cache *nextLevel;
 
 	void AddressToOffsetIndexTag(std::uintptr_t address, std::uintptr_t& offset, std::uintptr_t& index, std::uintptr_t& tag) const
 	{

@@ -95,14 +95,14 @@ public:
 			{
 				std::uint32_t evict = trees[index].getOverwriteTarget();
 				if (row[evict].dirty)
-					nextLevel->WriteData(address, nrOfBytes, value);
+					nextLevel->WriteData(index +row[evict].tag, nrOfBytes, row[evict].data);
 				line = &row[evict];
 			}
 		}
 
 		for (std::uint32_t i = 0; i < nrOfBytes; ++i) // write the data
 			line->data[offset + i] = value[i];
-
+		line->tag = tag;
 		line->dirty = true;
 		line->valid = true;
 	}

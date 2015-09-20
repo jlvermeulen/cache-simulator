@@ -36,10 +36,10 @@ void Game::Init()
 
 
 	std::uint32_t value = 0x04030201;
-	cache.WriteData<std::uint32_t>(0x00, value);
 	cache.WriteData<std::uint32_t>(0x04, value);
 	cache.WriteData<std::uint32_t>(0x08, value);
 	cache.WriteData<std::uint32_t>(0x0C, value);
+	cache.WriteData<std::uint32_t>(0x00, 0x04030201);
 	cache.WriteData<std::uint32_t>(0x10, 0x04030202);
 	cache.WriteData<std::uint32_t>(0x20, 0x04030203);
 	cache.WriteData<std::uint32_t>(0x30, 0x04030204);

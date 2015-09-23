@@ -1,6 +1,7 @@
 #include "precomp.h"
 #include "cache.h"
-
+#include <iostream>
+#include <string>
 // -----------------------------------------------------------
 // Map access
 // -----------------------------------------------------------
@@ -34,14 +35,41 @@ void Game::Init()
 	//cache.EvictWrite = &Cache<4, 4>::WriteData2;
 	//cache.FallbackRead = &Cache<4, 4>::ReadData2;
 
-
+	std::string ans;
 	std::uint32_t value = 0x04030201;
 	cache.WriteData<std::uint32_t>(0x04, value);
 	cache.WriteData<std::uint32_t>(0x08, value);
 	cache.WriteData<std::uint32_t>(0x0C, value);
+	std::cout << "Level 1 cache:\n";
+	cache.Print();
+	std::cout << std::endl;
+	std::cout << "Level 2 cache:\n";
+	cache2.Print();
+	std::getline(std::cin, ans);
+
 	cache.WriteData<std::uint32_t>(0x00, 0x04030201);
+	std::cout << "Level 1 cache:\n";
+	cache.Print();
+	std::cout << std::endl;
+	std::cout << "Level 2 cache:\n";
+	cache2.Print();
+	std::getline(std::cin, ans);
+
 	cache.WriteData<std::uint32_t>(0x10, 0x04030202);
+	std::cout << "Level 1 cache:\n";
+	cache.Print();
+	std::cout << std::endl;
+	std::cout << "Level 2 cache:\n";
+	cache2.Print();
+	std::getline(std::cin, ans);
+
 	cache.WriteData<std::uint32_t>(0x20, 0x04030203);
+	std::cout << "Level 1 cache:\n";
+	cache.Print();
+	std::cout << std::endl;
+	std::cout << "Level 2 cache:\n";
+	cache2.Print();
+	std::getline(std::cin, ans);
 	cache.WriteData<std::uint32_t>(0x30, 0x04030204);
 	cache.WriteData<std::uint32_t>(0x40, 0x04030205);
 	std::uint32_t r = cache.ReadData<std::uint32_t>(0x00);

@@ -47,7 +47,12 @@ public:
 	T ReadData(std::uintptr_t address)
 	{
 		byte data[sizeof(T)];
-		ReadData(address, sizeof(T), data);
+		CacheLine l = ReadData(address);// , sizeof(T), data);
+		std::uintptr_t tag, index, offset;
+		AddressToOffsetIndexTag(address, offset, index, tag);
+
+		for (int i = 0; i < sizeof(T); ++i)
+			data[i] = l.data[offset+i];
 		T* result = reinterpret_cast<T*>(data);
 		return *result;
 	}
@@ -56,18 +61,23 @@ public:
 	void WriteData(std::uintptr_t address, T value)
 	{
 		std::uintptr_t tag, index, offset;
-		AddressToOffsetIndexTag(address);
+		AddressToOffsetIndexTag(address, offset, index, tag);
 
+		CacheLine* line = GetLineForWrite(index, tag, address);
+
+		WriteData(line, offset, sizeof(T), reinterpret_cast<byte*>(&value));
+	}
+	CacheLine* GetLineForWrite(std::uintptr_t index, std::uintptr_t tag, std::uintptr_t address)
+	{
 		CacheLine* line = FindCacheLine(index, tag);
 		if (line == nullptr)
 		{
 			CacheLine cl = nextLevel->ReadData(address);
 			line = PlaceLine(index, cl);
 		}
-
-		WriteData(line, offset, sizeof(T), reinterpret_cast<byte*>(&value));
+		return line;
 	}
-
+	
 	void Print() const
 	{
 		for (int i = 0; i < size; ++i)
@@ -93,11 +103,12 @@ public:
 
 	CacheLine* PlaceLine(std::uintptr_t index, CacheLine cl)
 	{
-		CacheLine line;
+		CacheLine* line = nullptr;
 		CacheLine* row = cache[index];
 		for (std::uint32_t i = 0; i < assoc; ++i) // find open slot to write to
 			if (!row[i].valid)
 			{
+				row[i] = cl;
 				line = &row[i];
 				trees[index].setPath(i);
 				break;
@@ -111,13 +122,15 @@ public:
 				std::uint32_t oldaddress = 0;
 				oldaddress = index << offsetBits;
 				oldaddress += row[evict].tag << (offsetBits + indexBits);
-				nextLevel->WriteData(oldaddress, nrOfBytes, row[evict].data);
+				line = nextLevel->GetLineForWrite(index, row[evict].tag, oldaddress);
+				nextLevel->WriteData(line, 0,LINESIZE, row[evict].data);
 			}
+			row[evict] = cl;
 			line = &row[evict];
 			trees[index].setPath(evict);
 		}
 
-		return &line;
+		return line;
 	}
 
 	CacheLine ReadData(std::uintptr_t address)
@@ -128,14 +141,18 @@ public:
 		CacheLine* line = FindCacheLine(index, tag);
 		if (line == nullptr) // not in cache, relay to higher level
 		{
+			CacheLine l;
 			if (nextLevel == nullptr)
-				return; // TODO READ FROM RAM
-			CacheLine l = nextLevel->ReadData(address); // read from next level
-			WriteData(index, l); // store in cache
-			return l;
+			{
+				byte data[LINESIZE] = {};
+				l = CacheLine(tag, data, true, false); // TODO READ FROM RAM
+			}
+			else
+				CacheLine l = nextLevel->ReadData(address); // read from next level
+			return *PlaceLine(index, l); // store in cache
 		}
 
-		return line;
+		return *line;
 	}
 
 private:

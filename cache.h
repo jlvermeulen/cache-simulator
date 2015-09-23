@@ -27,7 +27,7 @@ class Cache
 public:
 	int offsetBits = 0, indexBits = 0;
 	PLRUtree trees[size];
-	Cache(Cache *nl = nullptr)
+	Cache(Cache* nl = nullptr)
 	{
 		nextLevel = nl;
 		byte data[LINESIZE] = {};
@@ -36,7 +36,8 @@ public:
 			trees[i] = PLRUtree(assoc);
 			for (int j = 0; j < assoc; ++j)
 				cache[i][j] = CacheLine(0, data, false, false);
-		}		
+		}
+
 		for (int i = LINESIZE; i != 1; i >>= 1, ++offsetBits); // determine number of bits in offset
 		for (int i = size; i != 1; i >>= 1, ++indexBits); // determine number of bits in index
 	}
@@ -54,7 +55,17 @@ public:
 	template<typename T>
 	void WriteData(std::uintptr_t address, T value)
 	{
-		WriteData(address, sizeof(T), reinterpret_cast<byte*>(&value));
+		std::uintptr_t tag, index, offset;
+		AddressToOffsetIndexTag(address);
+
+		CacheLine* line = FindCacheLine(index, tag);
+		if (line == nullptr)
+		{
+			CacheLine cl = nextLevel->ReadData(address);
+			line = PlaceLine(index, cl);
+		}
+
+		WriteData(line, offset, sizeof(T), reinterpret_cast<byte*>(&value));
 	}
 
 	void Print() const
@@ -71,63 +82,46 @@ public:
 			std::cout << std::endl;
 		}
 	}
-	void(Cache::*FallbackRead)(std::uintptr_t, std::uint32_t, byte*);
-	void(Cache::*EvictWrite)(std::uintptr_t, std::uint32_t, byte*);
 
-	void WriteData(std::uintptr_t address, std::uint32_t nrOfBytes, byte* value)
+	void WriteData(CacheLine* cl, std::uintptr_t offset, std::uint32_t nrOfBytes, byte* value)
 	{
-		if (address % nrOfBytes != 0) // not aligned, should never happen
-		{
-			std::cout << "UNALIGNED WRITE ATTEMPT" << std::endl;
-			return;
-		}
-
-		std::uintptr_t offset, index, tag;
-		AddressToOffsetIndexTag(address, offset, index, tag);
-
-		CacheLine* line = FindCacheLine(index, tag);
-		if (line == nullptr) // data wasn't in cache
-		{
-			CacheLine* row = cache[index];
-			for (std::uint32_t i = 0; i < assoc; ++i) // find open slot to write to
-				if (!row[i].valid)
-				{
-					line = &row[i];
-					trees[index].setPath(i);
-					break;
-				}
-
-			if (line == nullptr) // no open slots
-			{
-				std::uint32_t evict = trees[index].getOverwriteTarget();
-				if (row[evict].dirty)
-				{
-					std::uint32_t oldaddress = 0;
-					oldaddress = index << offsetBits;
-					oldaddress += row[evict].tag << (offsetBits + indexBits);
-					nextLevel->WriteData(oldaddress, nrOfBytes, row[evict].data);
-				}
-				line = &row[evict];
-				trees[index].setPath(evict);
-			}
-		}
-
 		for (std::uint32_t i = 0; i < nrOfBytes; ++i) // write the data
-			line->data[offset + i] = value[i];
-		line->tag = tag;
-		line->dirty = true;
-		line->valid = true;
+			cl->data[offset + i] = value[i];
+
+		cl->dirty = true;
 	}
 
-	void ReadData(std::uintptr_t address, std::uint32_t nrOfBytes, byte* result)
+	CacheLine* PlaceLine(std::uintptr_t index, CacheLine cl)
 	{
-		if (address % nrOfBytes != 0) // not aligned, should never happen
+		CacheLine line;
+		CacheLine* row = cache[index];
+		for (std::uint32_t i = 0; i < assoc; ++i) // find open slot to write to
+			if (!row[i].valid)
+			{
+				line = &row[i];
+				trees[index].setPath(i);
+				break;
+			}
 
+		if (line == nullptr) // no open slots
 		{
-			std::cout << "UNALIGNED READ ATTEMPT" << std::endl;
-			return;
+			std::uint32_t evict = trees[index].getOverwriteTarget();
+			if (row[evict].dirty)
+			{
+				std::uint32_t oldaddress = 0;
+				oldaddress = index << offsetBits;
+				oldaddress += row[evict].tag << (offsetBits + indexBits);
+				nextLevel->WriteData(oldaddress, nrOfBytes, row[evict].data);
+			}
+			line = &row[evict];
+			trees[index].setPath(evict);
 		}
 
+		return &line;
+	}
+
+	CacheLine ReadData(std::uintptr_t address)
+	{
 		std::uintptr_t offset, index, tag;
 		AddressToOffsetIndexTag(address, offset, index, tag);
 
@@ -136,13 +130,12 @@ public:
 		{
 			if (nextLevel == nullptr)
 				return; // TODO READ FROM RAM
-			nextLevel->ReadData(address, nrOfBytes, result); // read from next level
-			WriteData(address, nrOfBytes, result); // store in cache
-			return;
+			CacheLine l = nextLevel->ReadData(address); // read from next level
+			WriteData(index, l); // store in cache
+			return l;
 		}
 
-		for (std::uint32_t i = 0; i < nrOfBytes; ++i) // copy found data
-			result[i] = line->data[offset + i];
+		return line;
 	}
 
 private:

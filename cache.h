@@ -25,6 +25,7 @@ template<std::uint32_t size, std::uint32_t assoc>
 class Cache
 {
 public:
+	int offsetBits = 0, indexBits = 0;
 	PLRUtree trees[size];
 	Cache(Cache *nl = nullptr)
 	{
@@ -35,7 +36,9 @@ public:
 			trees[i] = PLRUtree(assoc);
 			for (int j = 0; j < assoc; ++j)
 				cache[i][j] = CacheLine(0, data, false, false);
-		}
+		}		
+		for (int i = LINESIZE; i != 1; i >>= 1, ++offsetBits); // determine number of bits in offset
+		for (int i = size; i != 1; i >>= 1, ++indexBits); // determine number of bits in index
 	}
 	~Cache() { }
 
@@ -57,6 +60,7 @@ public:
 	void Print() const
 	{
 		for (int i = 0; i < size; ++i)
+		{
 			for (int j = 0; j < assoc; ++j)
 			{
 				std::cout << "(0x" << std::hex << setfill('0') << setw(sizeof(cache[i][j].tag) * 2) << cache[i][j].tag << std::dec << ", 0x";
@@ -64,6 +68,8 @@ public:
 					std::cout << std::hex << setfill('0') << setw(sizeof(cache[i][j].data[k]) * 2) << (int)cache[i][j].data[k];
 				std::cout << std::dec << ", " << cache[i][j].valid << ", " << cache[i][j].dirty << ")" << std::endl;
 			}
+			std::cout << std::endl;
+		}
 	}
 	void(Cache::*FallbackRead)(std::uintptr_t, std::uint32_t, byte*);
 	void(Cache::*EvictWrite)(std::uintptr_t, std::uint32_t, byte*);
@@ -86,16 +92,21 @@ public:
 			for (std::uint32_t i = 0; i < assoc; ++i) // find open slot to write to
 				if (!row[i].valid)
 				{
-				line = &row[i];
-				trees[index].setPath(i);
-				break;
+					line = &row[i];
+					trees[index].setPath(i);
+					break;
 				}
 
 			if (line == nullptr) // no open slots
 			{
 				std::uint32_t evict = trees[index].getOverwriteTarget();
 				if (row[evict].dirty)
-					nextLevel->WriteData(index +row[evict].tag, nrOfBytes, row[evict].data); // NOT SURE IF CORRECT
+				{
+					std::uint32_t oldaddress = 0;
+					oldaddress = index << offsetBits;
+					oldaddress += row[evict].tag << (offsetBits + indexBits);
+					nextLevel->WriteData(oldaddress, nrOfBytes, row[evict].data);
+				}
 				line = &row[evict];
 				trees[index].setPath(evict);
 			}
@@ -123,6 +134,8 @@ public:
 		CacheLine* line = FindCacheLine(index, tag);
 		if (line == nullptr) // not in cache, relay to higher level
 		{
+			if (nextLevel == nullptr)
+				return; // TODO READ FROM RAM
 			nextLevel->ReadData(address, nrOfBytes, result); // read from next level
 			WriteData(address, nrOfBytes, result); // store in cache
 			return;
@@ -138,10 +151,6 @@ private:
 
 	void AddressToOffsetIndexTag(std::uintptr_t address, std::uintptr_t& offset, std::uintptr_t& index, std::uintptr_t& tag) const
 	{
-		int offsetBits = 0, indexBits = 0;
-		for (int i = LINESIZE; i != 1; i >>= 1, ++offsetBits); // determine number of bits in offset
-		for (int i = size; i != 1; i >>= 1, ++indexBits); // determine number of bits in index
-
 		offset = address & (LINESIZE - 1);
 		index = (address >> offsetBits) & (size - 1);
 		tag = (address >> (offsetBits + indexBits));

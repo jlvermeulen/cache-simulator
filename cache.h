@@ -72,7 +72,15 @@ public:
 		CacheLine* line = FindCacheLine(index, tag);
 		if (line == nullptr)
 		{
-			CacheLine cl = nextLevel->ReadData(address);
+			CacheLine cl;
+			
+			if (nextLevel == nullptr)
+			{
+				byte data[LINESIZE] = {};
+				cl = CacheLine(tag, data, true, false);
+			}
+			else
+				cl = nextLevel->ReadData(address);
 			line = PlaceLine(index, cl);
 		}
 		return line;

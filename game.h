@@ -10,7 +10,16 @@ struct Task
 class Map
 {
 public:
-	Map() : map( new int[513 * 513] ) {}
+	Map()
+	{
+		int size = 513 * 513;
+		if (size % LINESIZE > 0) // pad to multiple of LINESIZE
+		{
+			size -= size % LINESIZE;
+			size += LINESIZE;
+		}
+		map = new int[size];
+	}
 	void Init()
 	{
 		memset( map, 0, 513 * 513 * sizeof( int ) );

@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include <iomanip>
 #include "PLRUtree.h"
+
 #pragma once
 
-#define LINESIZE 4
+#define LINESIZE 64
 
 struct CacheLine
 {
@@ -21,13 +22,28 @@ struct CacheLine
 	}
 };
 
-template<std::uint32_t size, std::uint32_t assoc>
-class Cache
+class CacheBase
 {
 public:
 	int offsetBits = 0, indexBits = 0;
+
+	virtual CacheLine* GetLineForWrite(std::uintptr_t index, std::uintptr_t tag, std::uintptr_t address) = 0;
+
+	virtual void WriteData(CacheLine* cl, std::uintptr_t offset, std::uint32_t nrOfBytes, byte* value) = 0;
+
+	virtual CacheLine* PlaceLine(std::uintptr_t index, CacheLine cl) = 0;
+
+	virtual CacheLine ReadData(std::uintptr_t address) = 0;
+
+	virtual CacheLine* FindCacheLine(std::uintptr_t index, std::uintptr_t tag) = 0;
+};
+
+template<std::uint32_t size, std::uint32_t assoc>
+class Cache : public CacheBase
+{
+public:
 	PLRUtree trees[size];
-	Cache(Cache* nl = nullptr)
+	Cache(CacheBase* nl = nullptr)
 	{
 		nextLevel = nl;
 		byte data[LINESIZE] = {};
@@ -52,7 +68,7 @@ public:
 		AddressToOffsetIndexTag(address, offset, index, tag);
 
 		for (int i = 0; i < sizeof(T); ++i)
-			data[i] = l.data[offset+i];
+			data[i] = l.data[offset + i];
 		T* result = reinterpret_cast<T*>(data);
 		return *result;
 	}
@@ -67,6 +83,7 @@ public:
 
 		WriteData(line, offset, sizeof(T), reinterpret_cast<byte*>(&value));
 	}
+
 	CacheLine* GetLineForWrite(std::uintptr_t index, std::uintptr_t tag, std::uintptr_t address)
 	{
 		CacheLine* line = FindCacheLine(index, tag);
@@ -152,8 +169,12 @@ public:
 			CacheLine l;
 			if (nextLevel == nullptr)
 			{
-				byte data[LINESIZE] = {};
-				l = CacheLine(tag, data, true, false); // TODO READ FROM RAM
+				byte data[LINESIZE];
+				std::uintptr_t lineStart = address - (address % LINESIZE); // start of cache line in RAM
+				for (int i = 0; i < LINESIZE; i++)
+					data[i] = ReadFromRAM<byte>(reinterpret_cast<byte*>(lineStart + i));
+
+				l = CacheLine(tag, data, true, false);
 			}
 			else
 				CacheLine l = nextLevel->ReadData(address); // read from next level
@@ -165,7 +186,7 @@ public:
 
 private:
 	CacheLine cache[size][assoc];
-	Cache *nextLevel;
+	CacheBase* nextLevel;
 
 	void AddressToOffsetIndexTag(std::uintptr_t address, std::uintptr_t& offset, std::uintptr_t& index, std::uintptr_t& tag) const
 	{
@@ -189,17 +210,3 @@ private:
 		return line;
 	}
 };
-
-template<typename T>
-T READ(std::uintptr_t address)
-{
-	// prevent ReadFromRAM using caching
-	return ReadFromRAM<T>(reinterpret_cast<T*>(address));
-}
-
-template<typename T>
-void WRITE(std::uintptr_t address, T value)
-{
-	// prevent WriteToRAM using caching
-	WriteToRAM<T>(reinterpret_cast<T*>(address), value);
-}

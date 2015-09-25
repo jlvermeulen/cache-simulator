@@ -2,6 +2,25 @@
 #include "cache.h"
 #include <iostream>
 #include <string>
+
+//Cache<16, 4> l3;
+//Cache<8, 4> l2(&l3);
+//Cache<4, 4> l1(&l2);
+
+template<typename T>
+T READ(std::uintptr_t address)
+{
+	// prevent ReadFromRAM using caching
+	return ReadFromRAM<T>(reinterpret_cast<T*>(address));
+}
+
+template<typename T>
+void WRITE(std::uintptr_t address, T value)
+{
+	// prevent WriteToRAM using caching
+	WriteToRAM<T>(reinterpret_cast<T*>(address), value);
+}
+
 // -----------------------------------------------------------
 // Map access
 // -----------------------------------------------------------

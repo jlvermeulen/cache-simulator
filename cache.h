@@ -25,6 +25,7 @@ struct CacheLine
 class CacheBase
 {
 public:
+	int reads = 0, writes = 0, writemisses = 0, readmisses = 0, evicts = 0;
 	int offsetBits = 0, indexBits = 0;
 
 	virtual CacheLine* GetLineForWrite(std::uintptr_t index, std::uintptr_t tag, std::uintptr_t address) = 0;
@@ -62,6 +63,7 @@ public:
 	template<typename T>
 	T ReadData(std::uintptr_t address)
 	{
+		reads++;
 		byte data[sizeof(T)];
 		CacheLine l = ReadData(address);// , sizeof(T), data);
 		std::uintptr_t tag, index, offset;
@@ -76,6 +78,7 @@ public:
 	template<typename T>
 	void WriteData(std::uintptr_t address, T value)
 	{
+		writes++;
 		std::uintptr_t tag, index, offset;
 		AddressToOffsetIndexTag(address, offset, index, tag);
 
@@ -97,7 +100,10 @@ public:
 				cl = CacheLine(tag, data, true, false);
 			}
 			else
+			{
 				cl = nextLevel->ReadData(address);
+				writemisses++;
+			}
 			line = PlaceLine(index, cl);
 		}
 		return line;
@@ -149,6 +155,7 @@ public:
 				oldaddress += row[evict].tag << (offsetBits + indexBits);
 				line = nextLevel->GetLineForWrite(index, row[evict].tag, oldaddress);
 				nextLevel->WriteData(line, 0,LINESIZE, row[evict].data);
+				evicts++;
 			}
 			row[evict] = cl;
 			line = &row[evict];
@@ -166,6 +173,7 @@ public:
 		CacheLine* line = FindCacheLine(index, tag);
 		if (line == nullptr) // not in cache, relay to higher level
 		{
+			readmisses++;
 			CacheLine l;
 			if (nextLevel == nullptr)
 			{

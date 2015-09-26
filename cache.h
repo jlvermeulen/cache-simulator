@@ -11,7 +11,7 @@ struct CacheLine
 	std::uintptr_t tag;
 	byte data[LINESIZE];
 	bool valid, dirty;
-	
+	int set;
 
 	CacheLine() { }
 
@@ -20,6 +20,7 @@ struct CacheLine
 		tag = cl.tag;
 		valid = cl.valid;
 		dirty = cl.dirty;
+		set = cl.set;
 
 		for (int i = 0; i < LINESIZE; ++i)
 			data[i] = cl.data[i];
@@ -39,22 +40,14 @@ public:
 	int reads = 0, writes = 0, writemisses = 0, readmisses = 0, evicts = 0;
 	int offsetBits = 0, indexBits = 0;
 
-	virtual CacheLine* GetLineForWrite(std::uintptr_t index, std::uintptr_t tag, std::uintptr_t address) = 0;
-
-	virtual void WriteData(CacheLine* cl, std::uintptr_t offset, std::uint32_t nrOfBytes, byte* value) = 0;
-
-	virtual CacheLine* PlaceLine(std::uintptr_t index, CacheLine cl) = 0;
-
-	virtual CacheLine ReadData(std::uintptr_t address) = 0;
-
-	virtual CacheLine* FindCacheLine(std::uintptr_t index, std::uintptr_t tag) = 0;
+	virtual byte* ReadData(std::uintptr_t address) = 0;
+	virtual void WriteData(std::uintptr_t address, int nrOfBytes, byte* data) = 0;
 };
 
 template<std::uint32_t size, std::uint32_t assoc>
 class Cache : public CacheBase
 {
 public:
-	PLRUtree trees[size];
 	Cache(CacheBase* nl = nullptr)
 	{
 		nextLevel = nl;
@@ -69,63 +62,31 @@ public:
 		for (int i = LINESIZE; i != 1; i >>= 1, ++offsetBits); // determine number of bits in offset
 		for (int i = size; i != 1; i >>= 1, ++indexBits); // determine number of bits in index
 	}
+
 	~Cache() { }
 
+	// read data of type T at address
 	template<typename T>
 	T ReadData(std::uintptr_t address)
 	{
-		reads++;
-		byte data[sizeof(T)];
-		CacheLine l = ReadData(address);// , sizeof(T), data);
-		std::uintptr_t tag, index, offset;
+		std::uintptr_t offset, index, tag;
 		AddressToOffsetIndexTag(address, offset, index, tag);
 
+		byte data[sizeof(T)];
+		byte* line = ReadData(address);
 		for (int i = 0; i < sizeof(T); ++i)
-			data[i] = l.data[offset + i];
-		T* result = reinterpret_cast<T*>(data);
-		return *result;
+			data[i] = line[offset + i];
+
+		return *reinterpret_cast<T*>(data);
 	}
 
+	// write data of type T to address
 	template<typename T>
 	void WriteData(std::uintptr_t address, T value)
 	{
-		writes++;
-		std::uintptr_t tag, index, offset;
-		AddressToOffsetIndexTag(address, offset, index, tag);
-
-		CacheLine* line = GetLineForWrite(index, tag, address);
-
-		WriteData(line, offset, sizeof(T), reinterpret_cast<byte*>(&value));
+		WriteData(address, sizeof(T), reinterpret_cast<byte*>(&value));
 	}
 
-	CacheLine* GetLineForWrite(std::uintptr_t index, std::uintptr_t tag, std::uintptr_t address)
-	{
-		CacheLine* line = FindCacheLine(index, tag);
-		if (line == nullptr)
-		{
-			CacheLine cl;
-			
-			if (nextLevel == nullptr)
-			{
-				byte data[LINESIZE];
-				std::uintptr_t lineStart = address - (address % LINESIZE); // start of cache line in RAM
-				for (int i = 0; i < LINESIZE; i++)
-					data[i] = ReadFromRAM<byte>(reinterpret_cast<byte*>(lineStart + i));
-
-				cl = CacheLine(tag, data, true, false);
-			}
-			else
-			{
-				cl = nextLevel->ReadData(address);
-				cl.tag = tag;
-				writemisses++;
-			}
-
-			line = PlaceLine(index, cl);
-		}
-		return line;
-	}
-	
 	void Print() const
 	{
 		for (int i = 0; i < size; ++i)
@@ -141,109 +102,125 @@ public:
 		}
 	}
 
-	void WriteData(CacheLine* cl, std::uintptr_t offset, std::uint32_t nrOfBytes, byte* value)
+private:
+	CacheLine cache[size][assoc];
+	CacheBase* nextLevel;
+	PLRUtree trees[size];
+
+	// get cacheline data containing address
+	byte* ReadData(std::uintptr_t address)
 	{
-		for (std::uint32_t i = 0; i < nrOfBytes; ++i) // write the data
-			cl->data[offset + i] = value[i];
+		reads++;
 
-		cl->dirty = true;
-	}
+		std::uintptr_t offset, index, tag;
+		AddressToOffsetIndexTag(address, offset, index, tag);
 
-	CacheLine* PlaceLine(std::uintptr_t index, CacheLine cl)
-	{
-		CacheLine* line = nullptr;
-		CacheLine* row = cache[index];
-		for (std::uint32_t i = 0; i < assoc; ++i) // find open slot to write to
-			if (!row[i].valid)
-			{
-				row[i] = cl;
-				line = &row[i];
-				trees[index].setPath(i);
-				break;
-			}
-
-		if (line == nullptr) // no open slots
+		CacheLine* line = FindData(address);
+		if (line == nullptr) // data not in cache yet
 		{
-			std::uint32_t evict = trees[index].getOverwriteTarget();
-			if (row[evict].dirty)
-			{
-				std::uint32_t oldaddress = row[evict].tag << (offsetBits + indexBits);
-				oldaddress += index << offsetBits;
-
-				if (nextLevel == nullptr) // evict to RAM
-				{
-					for (int i = 0; i < LINESIZE; ++i)
-						WriteToRAM<byte>(reinterpret_cast<byte*>(oldaddress + i), row[evict].data[i]);
-				}
-				else // evict to higher cache level
-				{
-					line = nextLevel->GetLineForWrite(index, row[evict].tag >> (nextLevel->indexBits - indexBits), oldaddress);
-					nextLevel->WriteData(line, 0, LINESIZE, row[evict].data);
-				}
-
-				evicts++;
-			}
-			row[evict] = cl;
-			line = &row[evict];
-			trees[index].setPath(evict);
+			line = LoadData(address);
+			readmisses++;
 		}
 
-		return line;
+		trees[index].setPath(line->set); // update eviction policy
+		return line->data;
 	}
 
-	CacheLine ReadData(std::uintptr_t address)
+	// write data to cache at address
+	void WriteData(std::uintptr_t address, int nrOfBytes, byte* data)
+	{
+		writes++;
+
+		std::uintptr_t offset, index, tag;
+		AddressToOffsetIndexTag(address, offset, index, tag);
+
+		CacheLine* line = FindData(address);
+		if (line == nullptr) // data not in cache yet
+		{
+			line = LoadData(address);
+			writemisses++;
+		}
+
+		trees[index].setPath(line->set); // update eviction policy
+		for (int i = 0; i < nrOfBytes; ++i)
+			line->data[offset + i] = data[i];
+
+		line->dirty = true;
+	}
+
+	CacheLine* FindData(std::uintptr_t address)
 	{
 		std::uintptr_t offset, index, tag;
 		AddressToOffsetIndexTag(address, offset, index, tag);
 
-		CacheLine* line = FindCacheLine(index, tag);
-		if (line == nullptr) // not in cache, relay to higher level
-		{
-			readmisses++;
-			CacheLine l;
-			if (nextLevel == nullptr)
-			{
-				byte data[LINESIZE];
-				std::uintptr_t lineStart = address - (address % LINESIZE); // start of cache line in RAM
-				for (int i = 0; i < LINESIZE; i++)
-					data[i] = ReadFromRAM<byte>(reinterpret_cast<byte*>(lineStart + i));
+		CacheLine* row = cache[index];
+		for (int i = 0; i < assoc; ++i) // check all sets
+			if (row[i].valid && row[i].tag == tag)
+				return &row[i];
 
-				l = CacheLine(tag, data, true, false);
-			}
-			else
-			{
-				l = nextLevel->ReadData(address); // read from next level
-				l.tag = tag;
-			}
-			return *PlaceLine(index, l); // store in cache
-		}
-
-		return *line;
+		return nullptr;
 	}
 
-private:
-	CacheLine cache[size][assoc];
-	CacheBase* nextLevel;
+	// makes sure data at address is in cache and returns address of line
+	// use only when data is not in cache!
+	CacheLine* LoadData(std::uintptr_t address)
+	{
+		std::uintptr_t offset, index, tag;
+		AddressToOffsetIndexTag(address, offset, index, tag);
 
+		byte data[LINESIZE];
+		if (nextLevel == nullptr) // retrieve from RAM
+		{
+			std::uintptr_t lineStart = address - (address % LINESIZE);
+			for (int i = 0; i < LINESIZE; ++i)
+				data[i] = ReadFromRAM<byte>(reinterpret_cast<byte*>(lineStart + i));
+		}
+		else // retrieve from higher level cache
+		{
+			byte* cacheData = nextLevel->ReadData(address);
+			for (int i = 0; i < LINESIZE; ++i)
+				data[i] = cacheData[i];
+		}
+
+		CacheLine cl(tag, data, true, false);
+
+		CacheLine* row = cache[index];
+		for (int i = 0; i < assoc; ++i) // find an open slot, if it exists
+			if (!row[i].valid)
+			{
+				cl.set = i;
+				row[i] = cl;
+				return &row[i];
+			}
+
+		// no room left in set, evict something
+		int evict = trees[index].getOverwriteTarget();
+		if (row[evict].dirty) // need to write evicted data to higher level
+		{
+			// reconstruct address of first byte in evicted cache line
+			std::uint32_t oldAddress = 0;
+			oldAddress += row[evict].tag << (offsetBits + indexBits);
+			oldAddress += index << offsetBits;
+
+			if (nextLevel == nullptr) // evict to RAM
+				for (int i = 0; i < LINESIZE; ++i)
+					WriteToRAM<byte>(reinterpret_cast<byte*>(oldAddress + i), row[evict].data[i]);
+			else // evict to higher cache level
+				nextLevel->WriteData(oldAddress, LINESIZE, row[evict].data);
+
+			evicts++;
+		}
+
+		cl.set = evict;
+		row[evict] = cl; // put line in cache
+		return &row[evict];
+	}
+
+	// split address into offset, index and tag
 	void AddressToOffsetIndexTag(std::uintptr_t address, std::uintptr_t& offset, std::uintptr_t& index, std::uintptr_t& tag) const
 	{
 		offset = address & (LINESIZE - 1);
 		index = (address >> offsetBits) & (size - 1);
 		tag = (address >> (offsetBits + indexBits));
-	}
-
-	CacheLine* FindCacheLine(std::uintptr_t index, std::uintptr_t tag)
-	{
-		CacheLine* row = cache[index];
-		CacheLine* line = nullptr;
-		for (int i = 0; i < assoc; ++i) // find correct column
-			if (row[i].valid && row[i].tag == tag)
-			{
-				line = &row[i]; // found line containing our data
-				trees[index].setPath(i);
-				break;
-			}
-
-		return line;
 	}
 };

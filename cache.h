@@ -14,6 +14,17 @@ struct CacheLine
 	
 
 	CacheLine() { }
+
+	CacheLine(const CacheLine& cl)
+	{
+		tag = cl.tag;
+		valid = cl.valid;
+		dirty = cl.dirty;
+
+		for (int i = 0; i < LINESIZE; ++i)
+			data[i] = cl.data[i];
+	}
+
 	CacheLine(std::uintptr_t tag, byte* data, bool valid, bool dirty)
 		: tag(tag), valid(valid), dirty(dirty)
 	{
@@ -93,11 +104,19 @@ public:
 			
 			if (nextLevel == nullptr)
 			{
-				byte data[LINESIZE] = {};
+				byte data[LINESIZE];
+				std::uintptr_t lineStart = address - (address % LINESIZE); // start of cache line in RAM
+				for (int i = 0; i < LINESIZE; i++)
+					data[i] = ReadFromRAM<byte>(reinterpret_cast<byte*>(lineStart + i));
+
 				cl = CacheLine(tag, data, true, false);
 			}
 			else
+			{
 				cl = nextLevel->ReadData(address);
+				cl.tag = tag;
+			}
+
 			line = PlaceLine(index, cl);
 		}
 		return line;
@@ -144,11 +163,19 @@ public:
 			std::uint32_t evict = trees[index].getOverwriteTarget();
 			if (row[evict].dirty)
 			{
-				std::uint32_t oldaddress = 0;
-				oldaddress = index << offsetBits;
-				oldaddress += row[evict].tag << (offsetBits + indexBits);
-				line = nextLevel->GetLineForWrite(index, row[evict].tag, oldaddress);
-				nextLevel->WriteData(line, 0,LINESIZE, row[evict].data);
+				std::uint32_t oldaddress = row[evict].tag << (offsetBits + indexBits);
+				oldaddress += index << offsetBits;
+
+				if (nextLevel == nullptr) // evict to RAM
+				{
+					for (int i = 0; i < LINESIZE; ++i)
+						WriteToRAM<byte>(reinterpret_cast<byte*>(oldaddress + i), row[evict].data[i]);
+				}
+				else // evict to higher cache level
+				{
+					line = nextLevel->GetLineForWrite(index, row[evict].tag >> (nextLevel->indexBits - indexBits), oldaddress);
+					nextLevel->WriteData(line, 0, LINESIZE, row[evict].data);
+				}
 			}
 			row[evict] = cl;
 			line = &row[evict];
@@ -177,7 +204,10 @@ public:
 				l = CacheLine(tag, data, true, false);
 			}
 			else
-				CacheLine l = nextLevel->ReadData(address); // read from next level
+			{
+				l = nextLevel->ReadData(address); // read from next level
+				l.tag = tag;
+			}
 			return *PlaceLine(index, l); // store in cache
 		}
 

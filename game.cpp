@@ -3,13 +3,14 @@
 #include <iostream>
 #include <string>
 
-//Cache<16, 4> l3;
-//Cache<8, 4> l2(&l3);
-//Cache<4, 4> l1(&l2);
+Cache<16, 4> l3;
+Cache<8, 4> l2(&l3);
+Cache<4, 4> l1(&l2);
 
 template<typename T>
 T READ(std::uintptr_t address)
 {
+	return l1.ReadData<T>(address);
 	// prevent ReadFromRAM using caching
 	return ReadFromRAM<T>(reinterpret_cast<T*>(address));
 }
@@ -17,8 +18,9 @@ T READ(std::uintptr_t address)
 template<typename T>
 void WRITE(std::uintptr_t address, T value)
 {
+	l1.WriteData(address, value);
 	// prevent WriteToRAM using caching
-	WriteToRAM<T>(reinterpret_cast<T*>(address), value);
+	//WriteToRAM<T>(reinterpret_cast<T*>(address), value);
 }
 
 // -----------------------------------------------------------
@@ -47,66 +49,66 @@ void Game::Init()
 	taskPtr = 0;
 	Push( 0, 0, 512, 512, 256 );
 
-	std::uintptr_t address = 0x06;
-	std::uintptr_t tag = address >> 4;
-	Cache<4, 4> cache2;
-	Cache<4, 4> cache(&cache2);
-	//cache.EvictWrite = &Cache<4, 4>::WriteData2;
-	//cache.FallbackRead = &Cache<4, 4>::ReadData2;
-
-	std::string ans;
-	std::uint32_t value = 0x04030201;
-	//cache.WriteData<std::uint32_t>(0x04, value);
-//	cache.WriteData<std::uint32_t>(0x08, value);
-//	cache.WriteData<std::uint32_t>(0x0C, value);
+//	std::uintptr_t address = 0x06;
+//	std::uintptr_t tag = address >> 4;
+//	Cache<4, 4> cache2;
+//	Cache<4, 4> cache(&cache2);
+//	//cache.EvictWrite = &Cache<4, 4>::WriteData2;
+//	//cache.FallbackRead = &Cache<4, 4>::ReadData2;
+//
+//	std::string ans;
+//	std::uint32_t value = 0x04030201;
+//	//cache.WriteData<std::uint32_t>(0x04, value);
+////	cache.WriteData<std::uint32_t>(0x08, value);
+////	cache.WriteData<std::uint32_t>(0x0C, value);
+////	std::cout << "Level 1 cache:\n";
+////	cache.Print();
+////	std::cout << std::endl;
+////	std::cout << "Level 2 cache:\n";
+////	cache2.Print();
+////	std::getline(std::cin, ans);
+//
+//	cache.WriteData<std::uint32_t>(0x00, 0x04030201);
 //	std::cout << "Level 1 cache:\n";
 //	cache.Print();
 //	std::cout << std::endl;
 //	std::cout << "Level 2 cache:\n";
 //	cache2.Print();
-//	std::getline(std::cin, ans);
-
-	cache.WriteData<std::uint32_t>(0x00, 0x04030201);
-	std::cout << "Level 1 cache:\n";
-	cache.Print();
-	std::cout << std::endl;
-	std::cout << "Level 2 cache:\n";
-	cache2.Print();
-	//std::getline(std::cin, ans);
-
-	cache.WriteData<std::uint32_t>(0x10, 0x04030202);
-	std::cout << "Level 1 cache:\n";
-	cache.Print();
-	std::cout << std::endl;
-	std::cout << "Level 2 cache:\n";
-	cache2.Print();
-//	std::getline(std::cin, ans);
-
-	cache.WriteData<std::uint32_t>(0x20, 0x04030203);
-	std::cout << "Level 1 cache:\n";
-	cache.Print();
-	std::cout << std::endl;
-	std::cout << "Level 2 cache:\n";
-	cache2.Print();
-//	std::getline(std::cin, ans);
-
-	cache.WriteData<std::uint32_t>(0x30, 0x04030204);	
-	std::cout << "Level 1 cache:\n";
-	cache.Print();
-	std::cout << std::endl;
-	std::cout << "Level 2 cache:\n";
-	cache2.Print();
-	//std::getline(std::cin, ans);
-
-	cache.WriteData<std::uint32_t>(0x40, 0x04030205);
-	//std::uint32_t r = cache.ReadData<std::uint32_t>(0x00);
-
-	std::cout << "Level 1 cache:\n";
-	cache.Print();
-	std::cout << std::endl;
-	std::cout << "Level 2 cache:\n";
-	cache2.Print();
-	//std::uint16_t r = cache.ReadData<std::uint16_t>(address);
+//	//std::getline(std::cin, ans);
+//
+//	cache.WriteData<std::uint32_t>(0x10, 0x04030202);
+//	std::cout << "Level 1 cache:\n";
+//	cache.Print();
+//	std::cout << std::endl;
+//	std::cout << "Level 2 cache:\n";
+//	cache2.Print();
+////	std::getline(std::cin, ans);
+//
+//	cache.WriteData<std::uint32_t>(0x20, 0x04030203);
+//	std::cout << "Level 1 cache:\n";
+//	cache.Print();
+//	std::cout << std::endl;
+//	std::cout << "Level 2 cache:\n";
+//	cache2.Print();
+////	std::getline(std::cin, ans);
+//
+//	cache.WriteData<std::uint32_t>(0x30, 0x04030204);
+//	std::cout << "Level 1 cache:\n";
+//	cache.Print();
+//	std::cout << std::endl;
+//	std::cout << "Level 2 cache:\n";
+//	cache2.Print();
+//	//std::getline(std::cin, ans);
+//
+//	cache.WriteData<std::uint32_t>(0x40, 0x04030205);
+//	//std::uint32_t r = cache.ReadData<std::uint32_t>(0x00);
+//
+//	std::cout << "Level 1 cache:\n";
+//	cache.Print();
+//	std::cout << std::endl;
+//	std::cout << "Level 2 cache:\n";
+//	cache2.Print();
+//	//std::uint16_t r = cache.ReadData<std::uint16_t>(address);
 
 	//std::cout << "Reading cache at 0x" << std::hex << setfill('0') << setw(sizeof(address) * 2) << address << std::dec << std::endl;
 	//std::cout << "Value: 0x" << std::hex << setfill('0') << setw(sizeof(r) * 2) << r << std::dec << std::endl;

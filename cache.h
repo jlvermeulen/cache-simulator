@@ -43,6 +43,15 @@ public:
 
 	virtual byte* ReadData(std::uintptr_t address) = 0;
 	virtual void WriteData(std::uintptr_t address, int nrOfBytes, byte* data) = 0;
+
+	void PrintStats()
+	{
+		std::cout << "Reads: " << reads << std::endl;
+		std::cout << "Read misses: " << readmisses << std::endl;
+		std::cout << "Writes: " << writes << std::endl;
+		std::cout << "Write misses: " << writemisses << std::endl;
+		std::cout << "Evictions: " << evicts << std::endl;
+	}
 };
 
 template<std::uint32_t size, std::uint32_t assoc>

@@ -56,6 +56,7 @@ public:
 	void MouseMove( int _X, int _Y ) { /* implement if you want to detect mouse movement */ }
 	void KeyUp( int _Key ) { /* implement if you want to handle keys */ }
 	void KeyDown( int _Key ) { /* implement if you want to handle keys */ }
+	void PrintStats();
 private:
 	Surface* screen;
 	Map map;

@@ -136,6 +136,7 @@ void Game::Subdivide( int x1, int y1, int x2, int y2, int scale )
 	Push( cx, cy, x2, y2, scale / 2 );
 }
 
+bool printed = false;
 // -----------------------------------------------------------
 // Main application tick function
 // -----------------------------------------------------------
@@ -144,7 +145,15 @@ void Game::Tick( float _DT )
 	for( int i = 0; i < 1024; i++ )
 	{
 		// execute one subdivision task
-		if (taskPtr == 0) break;
+		if (taskPtr == 0)
+		{
+			if (!printed)
+			{
+				PrintStats();
+				printed = true;
+			}
+			break;
+		}
 		int x1 = task[--taskPtr].x1, x2 = task[taskPtr].x2;
 		int y1 = task[taskPtr].y1, y2 = task[taskPtr].y2;
 		Subdivide( x1, y1, x2, y2, task[taskPtr].scale );
@@ -156,4 +165,20 @@ void Game::Tick( float _DT )
 		int c = CLAMP( map.Get( x, y ) / 2, 0, 255 );
 		d[x + y * screen->GetWidth()] = c + (c << 8) + (c << 16);
 	}
+}
+
+// -----------------------------------------------------------
+// Print cache stats after program completion
+// -----------------------------------------------------------
+void Game::PrintStats()
+{
+	std::cout << "L1 cache stats" << std::endl;
+	l1.PrintStats();
+	std::cout << std::endl;
+	std::cout << "L2 cache stats" << std::endl;
+	l2.PrintStats();
+	std::cout << std::endl;
+	std::cout << "L3 cache stats" << std::endl;
+	l3.PrintStats();
+	std::cout << std::endl;
 }

@@ -3,24 +3,24 @@
 #include <iostream>
 #include <string>
 
-Cache<16, 4> l3;
-Cache<8, 4> l2(&l3);
-Cache<4, 4> l1(&l2);
+// Based on Intel Core i7 4770K (Haswell) specs and Table 2-3 (page 35) of the
+// Intel® 64 and IA-32 Architectures Optimization Reference Manual, September 2014
+// L3 set associativity found at http://www.cpu-world.com/CPUs/Core_i7/Intel-Core%20i7-4770K.html
+// L3 latency found at http://7-cpu.com/cpu/Haswell.html
+Cache<2048, 16> l3; // 2MB, 16-way set associative (latency 36 cycles, 8MB over 4 cores)
+Cache<512, 8> l2(&l3); // 256KB, 8-way set associative (fastest latency 11 cycles)
+Cache<64, 8> l1(&l2); // 32KB, 8-way set associative (fastest latency 4 cycles)
 
 template<typename T>
 T READ(std::uintptr_t address)
 {
 	return l1.ReadData<T>(address);
-	// prevent ReadFromRAM using caching
-	return ReadFromRAM<T>(reinterpret_cast<T*>(address));
 }
 
 template<typename T>
 void WRITE(std::uintptr_t address, T value)
 {
 	l1.WriteData(address, value);
-	// prevent WriteToRAM using caching
-	//WriteToRAM<T>(reinterpret_cast<T*>(address), value);
 }
 
 // -----------------------------------------------------------

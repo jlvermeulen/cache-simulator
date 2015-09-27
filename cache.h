@@ -11,7 +11,7 @@ struct CacheLine
 	std::uintptr_t tag;
 	byte data[LINESIZE];
 	bool valid, dirty;
-	int set;
+	int set; // the set this cache line is stored in
 
 	CacheLine() { }
 
@@ -34,11 +34,12 @@ struct CacheLine
 	}
 };
 
+// base class with public interface for access between cache levels
 class CacheBase
 {
 public:
-	int reads = 0, writes = 0, writemisses = 0, readmisses = 0, evicts = 0;
-	int offsetBits = 0, indexBits = 0;
+	int reads = 0, writes = 0, writemisses = 0, readmisses = 0, evicts = 0; // counters for stats
+	int offsetBits = 0, indexBits = 0; // number of bits in offset and index for this cache
 
 	virtual byte* ReadData(std::uintptr_t address) = 0;
 	virtual void WriteData(std::uintptr_t address, int nrOfBytes, byte* data) = 0;
@@ -87,6 +88,7 @@ public:
 		WriteData(address, sizeof(T), reinterpret_cast<byte*>(&value));
 	}
 
+	// prints all the data in the cache to console
 	void Print() const
 	{
 		for (int i = 0; i < size; ++i)
@@ -103,9 +105,9 @@ public:
 	}
 
 private:
-	CacheLine cache[size][assoc];
-	CacheBase* nextLevel;
-	PLRUtree trees[size];
+	CacheLine cache[size][assoc]; // the data
+	CacheBase* nextLevel; // pointer to next cache level, nullptr if next level is RAM
+	PLRUtree trees[size]; // the trees for PLRU eviction
 
 	// get cacheline data containing address
 	byte* ReadData(std::uintptr_t address)

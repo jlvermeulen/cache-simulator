@@ -1,0 +1,40 @@
+\documentclass[10pt,a4paper,oneside]{article}
+\usepackage{titling}
+\usepackage{fullpage}
+\usepackage{tabu}
+\usepackage[hidelinks]{hyperref}
+\setlength{\droptitle}{-5em}
+\posttitle{\par\end{center}}
+
+\title{Assignment 1}
+\author{Martijn Koenis, 3770214 \& Jordi Vermeulen, 3835634}
+\date{}
+\pagenumbering{gobble}
+
+\begin{document}
+\maketitle
+\vspace{-5em}
+
+\section{Cache architecture}
+We based the simulator on the cache architecture of the \emph{Haswell} line of Intel processors. Specifically, we based L3 cache size and latency and clock speed on the Intel Core i7-4770K. We obtained details about the cache architecture from Intel's \emph{Intel® 64 and IA-32 Architectures Optimization Reference Manual, September 2014}\footnote{\url{http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html}}, specifically from Table 2-3 on page 35. We obtained information about the latency and associativity of the L3 cache (which is specific to the i7-4770K) from 7-cpu.com\footnote{\url{http://7-cpu.com/cpu/Haswell.html}} and cpu-world.com\footnote{\url{http://www.cpu-world.com/CPUs/Core\_i7/Intel-Core\%20i7-4770K.html}}. This yielded the following set of parameters for our cache hierarchy:
+
+\begin{center}
+\begin{tabular}{l| l l l}
+	& Size	& Set associativity	& Latency			\\ \hline
+L1	& 32KB	& 8-way				& 4 cycles			\\
+L2	& 256KB	& 8-way				& 12 cycles			\\
+L3	& 2MB	& 16-way			& 36 cycles			\\
+RAM	& -		& -					& 36 cycles + 57ns	
+\end{tabular}
+\end{center}
+
+\noindent
+For our eviction policy we used the tree version of the Pseudo-LRU heuristic\footnote{\url{https://en.wikipedia.org/wiki/Pseudo-LRU}}. Our time measurements are based on a clock speed of 3.5 GHz. We assume that the latency mentioned are for that level only, such that a read that is relayed all the way to RAM will take 4 + 12 + 36 + 36 cycles and an additional 57ns. All cache lines are 64 bytes.
+
+\section{Program design}
+Our cache implementation consists of a templated class, making it possible to specify the number of lines and the associativity of each cache level. The cache supports reading and writing of any type (again, through the use of templates), converting any piece of data to an array of bytes for storage. It is implicitly assumed that cache size and associativity are powers of 2, and that any data being read does not cross cache line boundaries. The public API consist only of a Read\textless T\textgreater() and Write\textless T\textgreater(), both taking the address of the data as a parameter, as well as two methods for printing the entire contents of the cache and statistics about cache performance (Print() and PrintStats(), respectively).
+
+\section{The rest}
+We worked on the assignment together at all times.
+
+\end{document}

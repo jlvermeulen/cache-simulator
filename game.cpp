@@ -7,9 +7,16 @@
 // Intel® 64 and IA-32 Architectures Optimization Reference Manual, September 2014
 // L3 set associativity found at http://www.cpu-world.com/CPUs/Core_i7/Intel-Core%20i7-4770K.html
 // L3 latency found at http://7-cpu.com/cpu/Haswell.html
-Cache<2048, 16> l3; // 2MB, 16-way set associative (latency 36 cycles, 8MB over 4 cores)
-Cache<512, 8> l2(&l3); // 256KB, 8-way set associative (fastest latency 11 cycles)
-Cache<64, 8> l1(&l2); // 32KB, 8-way set associative (fastest latency 4 cycles)
+#define L1LATENCY 4
+#define L2LATENCY 12
+#define L3LATENCY 36
+#define RAMLATENCYCYCLES 36
+#define RAMLATENCTNANOSECONDS 57
+
+
+Cache<2048, 16> l3(nullptr, L3LATENCY); // 2MB, 16-way set associative (latency 36 cycles, 8MB over 4 cores)
+Cache<512, 8> l2(&l3, L2LATENCY); // 256KB, 8-way set associative (fastest latency 12 cycles)
+Cache<64, 8> l1(&l2, L1LATENCY); // 32KB, 8-way set associative (fastest latency 4 cycles)
 
 template<typename T>
 T READ(std::uintptr_t address)
@@ -181,4 +188,8 @@ void Game::PrintStats()
 	std::cout << "L3 cache stats" << std::endl;
 	l3.PrintStats();
 	std::cout << std::endl;
+	//ram
+	double latencyfromcycles = (l3.readmisses + l3.writemisses)*RAMLATENCYCYCLES / (double)CYCLESPERMILLISECOND;
+	double latencyfromns = RAMLATENCTNANOSECONDS * (l3.readmisses + l3.writemisses) / 1000000.0;
+	std::cout << "RAM latency: " << latencyfromcycles +latencyfromns << "ms"<<std::endl;
 }

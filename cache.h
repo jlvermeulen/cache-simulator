@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <iomanip>
 #include "PLRUtree.h"
+#define CYCLESPERMILLISECOND 3500000
 
 #pragma once
 
@@ -39,6 +40,7 @@ class CacheBase
 {
 public:
 	int reads = 0, writes = 0, writemisses = 0, readmisses = 0, evicts = 0; // counters for stats
+	int latency = 0;
 	int offsetBits = 0, indexBits = 0; // number of bits in offset and index for this cache
 
 	virtual byte* ReadData(std::uintptr_t address) = 0;
@@ -51,6 +53,8 @@ public:
 		std::cout << "Writes: " << writes << std::endl;
 		std::cout << "Write misses: " << writemisses << std::endl;
 		std::cout << "Evictions: " << evicts << std::endl;
+		std::uint64_t cycles = (reads + writes) * latency;
+		std::cout << "Total cycles: " << cycles << " (" << cycles / CYCLESPERMILLISECOND << "ms)" << std::endl;
 	}
 };
 
@@ -58,8 +62,9 @@ template<std::uint32_t size, std::uint32_t assoc>
 class Cache : public CacheBase
 {
 public:
-	Cache(CacheBase* nl = nullptr)
+	Cache(CacheBase* nl = nullptr, const int l = 0)
 	{
+		latency = l;
 		nextLevel = nl;
 		byte data[LINESIZE] = {};
 		for (int i = 0; i < size; ++i)
